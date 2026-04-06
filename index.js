@@ -9,7 +9,7 @@ const puppeteer = require('puppeteer');
 
     const browser = await puppeteer.launch({
       headless: "new",
-      executablePath: '/usr/bin/chromium-browser', // 🔥 use system chrome
+      executablePath: '/usr/bin/chromium-browser',
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
@@ -22,15 +22,14 @@ const puppeteer = require('puppeteer');
     console.log("Page loaded");
 
     // 🔐 LOGIN
-    await page.waitForSelector('#txtusername', { timeout: 10000 });
-
+    await page.waitForSelector('#txtusername');
     await page.type('#txtusername', process.env.USERNAME, { delay: 50 });
     await page.type('#password', process.env.PASSWORD, { delay: 50 });
 
     console.log("Filled credentials");
 
     // 🔢 CAPTCHA
-    await page.waitForSelector('.preview span', { timeout: 10000 });
+    await page.waitForSelector('.preview span');
 
     const captcha = await page.evaluate(() => {
       return [...document.querySelectorAll('.preview span')]
@@ -45,7 +44,6 @@ const puppeteer = require('puppeteer');
 
     // 🚀 LOGIN
     await page.click('#Submit');
-
     await page.waitForSelector('#menu', { timeout: 15000 });
 
     console.log("Logged in!");
@@ -60,7 +58,7 @@ const puppeteer = require('puppeteer');
     await page.waitForFunction(() => {
       return [...document.querySelectorAll('p')]
         .some(el => el.innerText.includes('G-Sports'));
-    }, { timeout: 15000 });
+    });
 
     await page.evaluate(() => {
       const el = [...document.querySelectorAll('p')]
@@ -69,16 +67,28 @@ const puppeteer = require('puppeteer');
     });
 
     console.log("Clicked G-Sports");
+
+    // 🔥 WAIT FOR IFRAME
+    console.log("Waiting for iframe...");
+    await page.waitForSelector('iframe', { timeout: 20000 });
+
+    const frameHandle = await page.$('iframe');
+    const frame = await frameHandle.contentFrame();
+
+    if (!frame) throw new Error("❌ Could not access iframe");
+
+    console.log("Switched to iframe");
+
     await new Promise(r => setTimeout(r, 5000));
 
-    // 🏢 FITNESS CENTRE (RETRY LOGIC)
+    // 🏢 FITNESS CENTRE
     console.log("Waiting for Fitness Centre...");
 
     let clicked = false;
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 15; i++) {
       try {
-        const found = await page.evaluate(() => {
+        const found = await frame.evaluate(() => {
           const el = [...document.querySelectorAll('h4')]
             .find(e => e.innerText.includes('Fitness & Performance Centre'));
           if (el) {
@@ -106,10 +116,10 @@ const puppeteer = require('puppeteer');
 
     await new Promise(r => setTimeout(r, 3000));
 
-    // 📅 DATE (2nd index → fallback 1st)
-    await page.waitForSelector('#res-dates');
+    // 📅 DATE
+    await frame.waitForSelector('#res-dates');
 
-    const dateValue = await page.evaluate(() => {
+    const dateValue = await frame.evaluate(() => {
       const select = document.querySelector('#res-dates');
       if (select.options.length > 2) {
         return select.options[2].value;
@@ -118,46 +128,48 @@ const puppeteer = require('puppeteer');
       }
     });
 
-    await page.select('#res-dates', dateValue);
+    await frame.select('#res-dates', dateValue);
     console.log("Date selected:", dateValue);
+
     await new Promise(r => setTimeout(r, 2000));
 
     // 🏋️ FACILITY
-    await page.waitForSelector('#facilities');
+    await frame.waitForSelector('#facilities');
 
-    const facilityValue = await page.evaluate(() => {
+    const facilityValue = await frame.evaluate(() => {
       const select = document.querySelector('#facilities');
       return select.options[1].value;
     });
 
-    await page.select('#facilities', facilityValue);
+    await frame.select('#facilities', facilityValue);
     console.log("Facility selected");
+
     await new Promise(r => setTimeout(r, 2000));
 
     // ⏰ SHIFT 3
     console.log("Waiting for Shift 3...");
-
-    await page.waitForSelector('button[data-text="Shift 3"]', { visible: true });
-    await page.click('button[data-text="Shift 3"]');
+    await frame.waitForSelector('button[data-text="Shift 3"]', { visible: true });
+    await frame.click('button[data-text="Shift 3"]');
 
     console.log("Shift 3 selected");
+
     await new Promise(r => setTimeout(r, 2000));
 
     // 🎯 SLOT LOOP
     console.log("Waiting for slot to open...");
 
     while (true) {
-      const available = await page.evaluate(() => {
+      const available = await frame.evaluate(() => {
         const btn = document.querySelector('button[data-slot="05:00 PM to 06:00 PM"]');
         return btn && !btn.disabled;
       });
 
       if (available) {
-        await page.click('button[data-slot="05:00 PM to 06:00 PM"]');
+        await frame.click('button[data-slot="05:00 PM to 06:00 PM"]');
         console.log("Slot selected!");
 
-        await page.waitForSelector('#proceed_to_pay_button', { visible: true });
-        await page.click('#proceed_to_pay_button');
+        await frame.waitForSelector('#proceed_to_pay_button', { visible: true });
+        await frame.click('#proceed_to_pay_button');
 
         console.log("✅ Gym booked successfully!");
         break;
