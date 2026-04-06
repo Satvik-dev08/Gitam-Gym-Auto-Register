@@ -118,10 +118,12 @@ const puppeteer = require('puppeteer-core');
 
     // ✅ FIX: Wait for facilities dropdown to actually populate after date selection
     console.log("Waiting for facilities to load...");
+    await new Promise(r => setTimeout(r, 3000));
+    
     await page.waitForFunction(() => {
       const select = document.querySelector('#facilities');
       return select && select.options.length > 1;
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
 
     await new Promise(r => setTimeout(r, 1000));
 
