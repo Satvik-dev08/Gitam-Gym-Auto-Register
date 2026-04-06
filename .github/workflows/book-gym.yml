@@ -36,6 +36,6 @@ jobs:
 
       - name: Run gym booking script
         env:
-          USERNAME: ${{ secrets.GITAM_USERNAME }}
-          PASSWORD: ${{ secrets.GITAM_PASSWORD }}
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
         run: node index.js
