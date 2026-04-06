@@ -8,7 +8,7 @@ const puppeteer = require('puppeteer');
     }
 
     const browser = await puppeteer.launch({
-      headless: "new", // ✅ modern headless
+      headless: "new",
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
@@ -53,7 +53,7 @@ const puppeteer = require('puppeteer');
     await page.click('#menu');
     await new Promise(r => setTimeout(r, 2000));
 
-    // 🏋️ G-Sports (FIXED CLICK METHOD)
+    // 🏋️ G-Sports
     console.log("Waiting for G-Sports button...");
 
     await page.waitForFunction(() => {
@@ -68,23 +68,41 @@ const puppeteer = require('puppeteer');
     });
 
     console.log("Clicked G-Sports");
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 5000));
 
-    // 🏢 Fitness Centre
+    // 🏢 FITNESS CENTRE (RETRY FIX)
     console.log("Waiting for Fitness Centre...");
 
-    await page.waitForFunction(() => {
-      return [...document.querySelectorAll('h4')]
-        .some(el => el.innerText.includes('Fitness & Performance Centre'));
-    });
+    let clicked = false;
 
-    await page.evaluate(() => {
-      const el = [...document.querySelectorAll('h4')]
-        .find(e => e.innerText.includes('Fitness & Performance Centre'));
-      if (el) el.closest('.li_ico_block').click();
-    });
+    for (let i = 0; i < 10; i++) {
+      try {
+        const found = await page.evaluate(() => {
+          const el = [...document.querySelectorAll('h4')]
+            .find(e => e.innerText.includes('Fitness & Performance Centre'));
+          if (el) {
+            el.closest('.li_ico_block').click();
+            return true;
+          }
+          return false;
+        });
 
-    console.log("Clicked Fitness Centre");
+        if (found) {
+          console.log("Clicked Fitness Centre");
+          clicked = true;
+          break;
+        }
+
+      } catch (e) {}
+
+      console.log("Retrying Fitness Centre...");
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    if (!clicked) {
+      throw new Error("❌ Could not find Fitness Centre");
+    }
+
     await new Promise(r => setTimeout(r, 3000));
 
     // 📅 DATE (2nd index → fallback 1st)
