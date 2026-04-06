@@ -9,6 +9,7 @@ const puppeteer = require('puppeteer');
 
     const browser = await puppeteer.launch({
       headless: "new",
+      executablePath: '/usr/bin/chromium-browser', // 🔥 use system chrome
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
@@ -70,7 +71,7 @@ const puppeteer = require('puppeteer');
     console.log("Clicked G-Sports");
     await new Promise(r => setTimeout(r, 5000));
 
-    // 🏢 FITNESS CENTRE (RETRY FIX)
+    // 🏢 FITNESS CENTRE (RETRY LOGIC)
     console.log("Waiting for Fitness Centre...");
 
     let clicked = false;
