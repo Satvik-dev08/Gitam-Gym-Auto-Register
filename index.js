@@ -122,27 +122,64 @@ const puppeteer = require('puppeteer-core');
         .some(el => el.innerText && el.innerText.includes('G-Sports'));
     }, { timeout: 15000 });
 
-    console.log("Found G-Sports link, clicking it...");
+    console.log("Found G-Sports link, inspecting it...");
     
-    const gsportsClicked = await page.evaluate(() => {
+    const gSportsLinkInfo = await page.evaluate(() => {
+      const el = [...document.querySelectorAll('p, a')]
+        .find(e => e.innerText && e.innerText.includes('G-Sports'));
+      const linkEl = el.closest('a') || el;
+      return {
+        tag: linkEl.tagName,
+        href: linkEl.href,
+        onclick: linkEl.onclick ? String(linkEl.onclick) : null,
+        dataUrl: linkEl.getAttribute('data-url'),
+        dataHref: linkEl.getAttribute('data-href'),
+        classNames: linkEl.className,
+        attributes: Array.from(linkEl.attributes).map(attr => ({ name: attr.name, value: attr.value }))
+      };
+    });
+    
+    console.log("G-Sports link info:", JSON.stringify(gSportsLinkInfo, null, 2));
+
+    console.log("Clicking G-Sports...");
+    
+    await page.evaluate(() => {
       const el = [...document.querySelectorAll('p, a')]
         .find(e => e.innerText && e.innerText.includes('G-Sports'));
       if (el) {
         const link = el.closest('a') || el;
         link.click();
-        return true;
       }
-      return false;
     });
 
-    if (!gsportsClicked) {
-      throw new Error("Could not find or click G-Sports element");
-    }
-
-    console.log("Clicked G-Sports, waiting for content to load...");
+    console.log("Clicked G-Sports, waiting for content...");
     
-    // Wait longer for the page to load
-    await new Promise(r => setTimeout(r, 8000));
+    // Wait longer and check for modals/new content
+    await new Promise(r => setTimeout(r, 3000));
+    
+    const pageAfterClick = await page.evaluate(() => {
+      return {
+        url: window.location.href,
+        title: document.title,
+        visibleModals: document.querySelectorAll('[role="dialog"]:not([style*="display: none"]), .modal:not([style*="display: none"])').length,
+        hasGSportsContent: document.body.innerHTML.includes('fitness') || document.body.innerHTML.includes('G-Sports'),
+        bodyLength: document.body.innerText.length
+      };
+    });
+    console.log("Page state after G-Sports click:", pageAfterClick);
+    
+    // If still on Home, try alternative approach
+    if (pageAfterClick.url.includes('/Home')) {
+      console.log("Still on Home page, trying direct navigation...");
+      if (gSportsLinkInfo.href && !gSportsLinkInfo.href.includes('javascript')) {
+        console.log("Navigating to:", gSportsLinkInfo.href);
+        await page.goto(gSportsLinkInfo.href, { waitUntil: 'networkidle0', timeout: 15000 }).catch(() => {
+          console.log("Navigation failed, continuing...");
+        });
+      }
+    }
+    
+    await new Promise(r => setTimeout(r, 5000));
 
     // 🏢 FITNESS CENTRE
     console.log("Waiting for Fitness Centre cards...");
