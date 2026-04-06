@@ -11,9 +11,7 @@ const puppeteer = require('puppeteer');
       headless: true,
       args: [
         '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-setuid-sandbox'
       ]
     });
 
