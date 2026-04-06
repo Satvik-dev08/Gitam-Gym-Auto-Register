@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
 (async () => {
   try {
@@ -9,20 +9,19 @@ const puppeteer = require('puppeteer');
 
     const browser = await puppeteer.launch({
       headless: "new",
-      executablePath: process.env.PUPPETEER_EXEC_PATH || undefined, // allow CI to override
+      executablePath: '/usr/bin/google-chrome-stable', // uses Chrome already on GitHub's runner
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',      // ✅ critical for GitHub Actions (low /dev/shm)
-        '--disable-gpu',                // ✅ no GPU in CI
-        '--single-process',             // ✅ more stable in constrained envs
-        '--no-zygote',                  // ✅ pairs with single-process
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process',
+        '--no-zygote',
       ]
     });
 
     const page = await browser.newPage();
 
-    // Set a real user-agent to avoid bot detection
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
@@ -41,19 +40,16 @@ const puppeteer = require('puppeteer');
 
     console.log("Filled credentials");
 
-    // 🔢 CAPTCHA — evaluate the math expression shown in spans
+    // 🔢 CAPTCHA
     await page.waitForSelector('.preview span', { timeout: 10000 });
 
     const captcha = await page.evaluate(() => {
       const spans = [...document.querySelectorAll('.preview span')];
       const text = spans.map(el => el.innerText.trim()).join('');
-      // Strip non-numeric/operator chars, then eval simple arithmetic
       const expr = text.replace(/[^0-9+\-*/\s]/g, '').trim();
       try {
-        // eslint-disable-next-line no-eval
         return String(eval(expr));
       } catch {
-        // Fallback: grab digits only
         return text.replace(/\D/g, '');
       }
     });
@@ -62,7 +58,7 @@ const puppeteer = require('puppeteer');
 
     await page.type('#captcha_form', captcha);
 
-    // 🚀 LOGIN
+    // 🚀 LOGIN SUBMIT
     await page.click('#Submit');
     await page.waitForSelector('#menu', { timeout: 15000 });
 
@@ -88,8 +84,6 @@ const puppeteer = require('puppeteer');
 
     console.log("Clicked G-Sports");
 
-    // 🔥 WAIT FOR CONTENT LOAD
-    console.log("Waiting for G-Sports content to load...");
     await new Promise(r => setTimeout(r, 6000));
 
     // 🏢 FITNESS CENTRE
@@ -100,16 +94,14 @@ const puppeteer = require('puppeteer');
 
     await page.evaluate(() => {
       const cards = document.querySelectorAll('.li_ico_block');
-      if (cards.length > 0) {
-        cards[0].click();
-      }
+      if (cards.length > 0) cards[0].click();
     });
 
     console.log("Clicked Fitness Centre");
 
     await new Promise(r => setTimeout(r, 4000));
 
-    // 📅 DATE (2nd index → fallback 1st)
+    // 📅 DATE
     await page.waitForSelector('#res-dates', { timeout: 15000 });
 
     const dateValue = await page.evaluate(() => {
@@ -151,7 +143,7 @@ const puppeteer = require('puppeteer');
     // 🎯 SLOT LOOP
     console.log("Waiting for slot to open...");
 
-    const MAX_RETRIES = 30; // ~1 minute max wait
+    const MAX_RETRIES = 30;
     let attempts = 0;
 
     while (attempts < MAX_RETRIES) {
@@ -184,6 +176,6 @@ const puppeteer = require('puppeteer');
 
   } catch (err) {
     console.error("ERROR:", err);
-    process.exit(1); // ✅ ensures GitHub Actions marks the job as failed
+    process.exit(1);
   }
 })();

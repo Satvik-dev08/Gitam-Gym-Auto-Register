@@ -1,0 +1,49 @@
+name: Gym Slot Booking
+
+on:
+  # ⏰ Runs every day at 11:00 AM IST (5:30 AM UTC)
+  # To change the time, edit the cron line below
+  # IST = UTC + 5:30, so subtract 5:30 from your desired IST time to get UTC
+  # Examples:
+  #   10:00 AM IST = 4:30 AM UTC  → '30 4 * * *'
+  #   12:00 PM IST = 6:30 AM UTC  → '30 6 * * *'
+  schedule:
+    - cron: '29 11 * * *'
+
+  # ▶️ Also lets you trigger it manually from the Actions tab on GitHub
+  workflow_dispatch:
+
+jobs:
+  book-gym:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ⚡ Cache node_modules so npm install is fast on repeat runs
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      # 🌐 Install Chrome (already on GitHub runner, this just ensures it's available)
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run gym booking script
+        env:
+          USERNAME: ${{ secrets.GITAM_USERNAME }}
+          PASSWORD: ${{ secrets.GITAM_PASSWORD }}
+        run: node index.js
