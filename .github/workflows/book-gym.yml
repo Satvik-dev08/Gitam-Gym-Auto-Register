@@ -26,21 +26,13 @@ jobs:
         with:
           node-version: '20'
 
-      # ⚡ Cache node_modules so npm install is fast on repeat runs
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            node-modules-${{ runner.os }}-
-
-      # 🌐 Install Chrome (already on GitHub runner, this just ensures it's available)
+      # ✅ Setup Chrome BEFORE installing dependencies
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@v1
 
+      # ✅ Clean install every time — no cache (avoids corrupted node_modules)
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run gym booking script
         env:
