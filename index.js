@@ -9,7 +9,7 @@ const puppeteer = require('puppeteer-core');
 
     const browser = await puppeteer.launch({
       headless: "new",
-      executablePath: '/usr/bin/google-chrome-stable', // uses Chrome already on GitHub's runner
+      executablePath: '/usr/bin/google-chrome-stable',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -116,18 +116,24 @@ const puppeteer = require('puppeteer-core');
     await page.select('#res-dates', dateValue);
     console.log("Date selected:", dateValue);
 
-    await new Promise(r => setTimeout(r, 2000));
+    // ✅ FIX: Wait for facilities dropdown to actually populate after date selection
+    console.log("Waiting for facilities to load...");
+    await page.waitForFunction(() => {
+      const select = document.querySelector('#facilities');
+      return select && select.options.length > 1;
+    }, { timeout: 15000 });
+
+    await new Promise(r => setTimeout(r, 1000));
 
     // 🏋️ FACILITY
-    await page.waitForSelector('#facilities', { timeout: 10000 });
-
     const facilityValue = await page.evaluate(() => {
       const select = document.querySelector('#facilities');
+      console.log("Facilities count:", select.options.length);
       return select.options[1].value;
     });
 
     await page.select('#facilities', facilityValue);
-    console.log("Facility selected");
+    console.log("Facility selected:", facilityValue);
 
     await new Promise(r => setTimeout(r, 2000));
 
