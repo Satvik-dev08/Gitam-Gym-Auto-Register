@@ -43,6 +43,14 @@ const puppeteer = require('puppeteer-core');
     // 🔢 CAPTCHA
     await page.waitForSelector('.preview span', { timeout: 10000 });
 
+    const captchaDebug = await page.evaluate(() => {
+      const spans = [...document.querySelectorAll('.preview span')];
+      const htmlContent = spans.map(el => el.innerHTML).join(' | ');
+      const text = spans.map(el => el.innerText.trim()).join('');
+      return { htmlContent, text, spanCount: spans.length };
+    });
+    console.log("Captcha debug:", captchaDebug);
+
     const captcha = await page.evaluate(() => {
       const spans = [...document.querySelectorAll('.preview span')];
       const text = spans.map(el => el.innerText.trim()).join('');
@@ -54,19 +62,32 @@ const puppeteer = require('puppeteer-core');
       }
     });
 
-    console.log("Captcha:", captcha);
+    console.log("Captcha extracted:", captcha);
 
     await page.type('#captcha_form', captcha);
 
     // 🚀 LOGIN SUBMIT
+    const submitBtn = await page.$('#Submit');
+    if (!submitBtn) {
+      throw new Error("Submit button not found!");
+    }
+    
     await page.click('#Submit');
-    await page.waitForSelector('#menu', { timeout: 15000 });
+    
+    // Wait for navigation or menu to appear
+    try {
+      await page.waitForSelector('#menu', { timeout: 10000 });
+    } catch (e) {
+      // Check if we got an error message
+      const errorMsg = await page.evaluate(() => {
+        const errorElement = document.querySelector('[class*="error"], [class*="alert"]');
+        return errorElement ? errorElement.innerText : "No error message found";
+      });
+      console.log("Login failed. Error on page:", errorMsg);
+      throw new Error(`Login failed after captcha. Details: ${errorMsg}`);
+    }
 
     console.log("Logged in!");
-
-    // 📂 MENU
-    await page.click('#menu');
-    await new Promise(r => setTimeout(r, 2000));
 
     // 🏋️ G-Sports
     console.log("Waiting for G-Sports button...");
