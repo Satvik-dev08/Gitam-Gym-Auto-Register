@@ -44,25 +44,42 @@ const puppeteer = require('puppeteer-core');
     await page.waitForSelector('.preview span', { timeout: 10000 });
 
     const captchaDebug = await page.evaluate(() => {
+      const previewDiv = document.querySelector('.preview');
+      const fullHTML = previewDiv ? previewDiv.innerHTML : "Not found";
       const spans = [...document.querySelectorAll('.preview span')];
-      const htmlContent = spans.map(el => el.innerHTML).join(' | ');
-      const text = spans.map(el => el.innerText.trim()).join('');
-      return { htmlContent, text, spanCount: spans.length };
+      const textContent = previewDiv ? previewDiv.innerText : "Not found";
+      return { 
+        fullHTML, 
+        textContent,
+        spanCount: spans.length,
+        spanTexts: spans.map(el => el.innerText.trim())
+      };
     });
-    console.log("Captcha debug:", captchaDebug);
+    console.log("Captcha debug:", JSON.stringify(captchaDebug, null, 2));
 
     const captcha = await page.evaluate(() => {
-      const spans = [...document.querySelectorAll('.preview span')];
-      const text = spans.map(el => el.innerText.trim()).join('');
-      const expr = text.replace(/[^0-9+\-*/\s]/g, '').trim();
+      // Get all text from preview including all children
+      const previewDiv = document.querySelector('.preview');
+      if (!previewDiv) return "";
+      
+      // Get all text nodes and element text
+      let fullText = previewDiv.innerText.replace(/\s+/g, '');
+      
+      // If it looks like a math expression, try to evaluate
+      const expr = fullText.replace(/[^0-9+\-*/().\s]/g, '').trim();
+      console.log("Expression to eval:", expr);
+      
       try {
-        return String(eval(expr));
-      } catch {
-        return text.replace(/\D/g, '');
+        const result = eval(expr);
+        return String(Math.round(result));
+      } catch (e) {
+        // Fallback: just return the digits
+        console.log("Eval failed, using digits only");
+        return fullText.replace(/\D/g, '');
       }
     });
 
-    console.log("Captcha extracted:", captcha);
+    console.log("Captcha answer:", captcha);
 
     await page.type('#captcha_form', captcha);
 
