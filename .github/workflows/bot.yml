@@ -21,8 +21,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 🔥 SIMPLE & RELIABLE FIX
-      - name: Install Chromium (Puppeteer handles it)
+      # ✅ NO APT-GET AT ALL (IMPORTANT)
+      - name: Install Chromium via Puppeteer
         run: npx puppeteer browsers install chrome
 
       - name: Run bot
