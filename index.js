@@ -164,16 +164,30 @@ const puppeteer = require('puppeteer-core');
     console.log("G-Sports page check:", gsportsPageDebug);
 
     // Try to find and click fitness centre
+    console.log("Looking for 'Fitness & Performance Centre' card...");
+    
     const fitnessFound = await page.evaluate(() => {
-      // Look for fitness centre explicitly
-      const liElements = document.querySelectorAll('li, div[class*="item"], div[class*="card"]');
+      // Look specifically for Fitness & Performance Centre
+      const cards = document.querySelectorAll('.li_ico_block');
+      console.log(`Found ${cards.length} cards total`);
+      
       let target = null;
-      for (let el of liElements) {
-        if (el.innerText && el.innerText.toLowerCase().includes('fitness')) {
-          target = el;
+      for (let card of cards) {
+        const text = card.innerText || card.textContent || '';
+        console.log(`Card text: "${text}"`);
+        if (text.toLowerCase().includes('fitness') && text.toLowerCase().includes('performance')) {
+          target = card;
+          console.log("Found Fitness & Performance Centre!");
           break;
         }
       }
+      
+      if (!target && cards.length > 0) {
+        // Fallback: click first card if fitness not found
+        target = cards[0];
+        console.log("Fitness not found, defaulting to first card");
+      }
+      
       if (target) {
         target.click?.() || target.parentElement?.click?.();
         return true;
@@ -181,20 +195,11 @@ const puppeteer = require('puppeteer-core');
       return false;
     });
 
-    if (fitnessFound) {
-      console.log("Clicked Fitness Centre via text search");
+    if (!fitnessFound) {
+      console.log("Could not find and click fitness centre");
     } else {
-      console.log("Fitness text not found, trying selector");
-      try {
-        await page.waitForSelector('.li_ico_block', { timeout: 10000 });
-        await page.click('.li_ico_block');
-        console.log("Clicked first .li_ico_block");
-      } catch (e) {
-        console.log("Could not find fitness centre element");
-      }
+      console.log("Clicked Fitness Centre");
     }
-
-    await new Promise(r => setTimeout(r, 5000));
 
     await new Promise(r => setTimeout(r, 4000));
 
@@ -210,18 +215,35 @@ const puppeteer = require('puppeteer-core');
       }
     });
 
+    console.log("Available date options:");
+    await page.evaluate(() => {
+      const select = document.querySelector('#res-dates');
+      [...select.options].forEach((opt, i) => {
+        console.log(`  [${i}] ${opt.text} = ${opt.value}`);
+      });
+    });
+
+    console.log("Selecting date:", dateValue);
     await page.select('#res-dates', dateValue);
     console.log("Date selected:", dateValue);
 
+    // Trigger change event to make sure facilities are fetched
+    await page.evaluate(() => {
+      const select = document.querySelector('#res-dates');
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    console.log("Change event dispatched");
+
     // ✅ FIX: Wait for facilities dropdown to actually populate after date selection
     console.log("Waiting for facilities to load...");
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 2000));
     
     // Debug what's on the page after date selection
     const facilitiesDebug = await page.evaluate(() => {
       const dateSelect = document.querySelector('#res-dates');
       const facilitiesSelect = document.querySelector('#facilities');
       const allSelects = [...document.querySelectorAll('select')];
+      const courtsSelect = document.querySelector('#courts');
       
       return {
         dateSelectFound: !!dateSelect,
@@ -229,6 +251,7 @@ const puppeteer = require('puppeteer-core');
         facilitiesValue: facilitiesSelect?.value,
         facilitiesOptionsCount: facilitiesSelect?.options?.length || 0,
         facilitiesOptions: facilitiesSelect ? [...facilitiesSelect.options].map((o, i) => ({ index: i, value: o.value, text: o.text })) : [],
+        courtsOptionsCount: courtsSelect?.options?.length || 0,
         allSelectCount: allSelects.length,
         allSelectIds: allSelects.map(s => s.id)
       };
@@ -239,24 +262,37 @@ const puppeteer = require('puppeteer-core');
       throw new Error("Facilities dropdown not found on page");
     }
 
-    if (facilitiesDebug.facilitiesOptionsCount <= 1) {
-      console.log("Facilities not populated yet, waiting more...");
-      await new Promise(r => setTimeout(r, 5000));
+    // Some pages may populate via courts instead, or via API call
+    if (facilitiesDebug.facilitiesOptionsCount === 1) {
+      console.log("Facilities still empty, waiting for API call...");
       
-      const facilitiesDebug2 = await page.evaluate(() => {
-        const facilitiesSelect = document.querySelector('#facilities');
-        return {
-          optionsCount: facilitiesSelect?.options?.length || 0,
-          options: facilitiesSelect ? [...facilitiesSelect.options].map((o, i) => ({ index: i, value: o.value, text: o.text })) : []
-        };
-      });
-      console.log("Facilities after waiting more:", facilitiesDebug2);
+      // Wait for any network activity and facility options to appear
+      for (let i = 0; i < 5; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        
+        const facilitiesCount = await page.evaluate(() => {
+          const select = document.querySelector('#facilities');
+          return select?.options?.length || 0;
+        });
+        
+        console.log(`Facilities check ${i + 1}: ${facilitiesCount} options`);
+        
+        if (facilitiesCount > 1) {
+          console.log("Facilities populated!");
+          break;
+        }
+      }
     }
 
     // 🏋️ FACILITY
     const facilityValue = await page.evaluate(() => {
       const select = document.querySelector('#facilities');
       if (!select || select.options.length <= 1) {
+        console.log("No facilities available, trying courts instead");
+        const courtsSelect = document.querySelector('#courts');
+        if (courtsSelect && courtsSelect.options.length > 1) {
+          return courtsSelect.options[1].value;
+        }
         return select?.options[0]?.value || '';
       }
       return select.options[1].value;
@@ -265,8 +301,18 @@ const puppeteer = require('puppeteer-core');
     console.log("Attempting to select facility:", facilityValue);
     
     if (facilityValue) {
-      await page.select('#facilities', facilityValue);
-      console.log("Facility selected:", facilityValue);
+      try {
+        await page.select('#facilities', facilityValue);
+        console.log("Facility selected:", facilityValue);
+      } catch (e) {
+        console.log("Could not select facilities, trying courts dropdown");
+        try {
+          await page.select('#courts', facilityValue);
+          console.log("Court selected instead:", facilityValue);
+        } catch (e2) {
+          console.log("Could not select courts either, continuing anyway");
+        }
+      }
     }
 
     await new Promise(r => setTimeout(r, 2000));
