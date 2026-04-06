@@ -106,32 +106,43 @@ const puppeteer = require('puppeteer-core');
 
     console.log("Logged in!");
 
+    // 📂 Check if we need to open menu
+    const menuBtn = await page.$('#menu');
+    if (menuBtn) {
+      console.log("Clicking menu button...");
+      await page.click('#menu');
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
     // 🏋️ G-Sports
     console.log("Waiting for G-Sports button...");
 
     await page.waitForFunction(() => {
-      return [...document.querySelectorAll('p')]
-        .some(el => el.innerText.includes('G-Sports'));
+      return [...document.querySelectorAll('p, a')]
+        .some(el => el.innerText && el.innerText.includes('G-Sports'));
     }, { timeout: 15000 });
 
     console.log("Found G-Sports link, clicking it...");
     
-    await page.evaluate(() => {
-      const el = [...document.querySelectorAll('p')]
-        .find(e => e.innerText.includes('G-Sports'));
+    const gsportsClicked = await page.evaluate(() => {
+      const el = [...document.querySelectorAll('p, a')]
+        .find(e => e.innerText && e.innerText.includes('G-Sports'));
       if (el) {
-        el.closest('a').click();
+        const link = el.closest('a') || el;
+        link.click();
+        return true;
       }
+      return false;
     });
 
-    console.log("Clicked G-Sports, waiting for page to load...");
+    if (!gsportsClicked) {
+      throw new Error("Could not find or click G-Sports element");
+    }
+
+    console.log("Clicked G-Sports, waiting for content to load...");
     
-    // Wait for network to idle after click
-    await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 15000 }).catch(() => {
-      console.log("No full navigation detected, content likely loaded dynamically");
-    });
-
-    await new Promise(r => setTimeout(r, 5000));
+    // Wait longer for the page to load
+    await new Promise(r => setTimeout(r, 8000));
 
     // 🏢 FITNESS CENTRE
     console.log("Waiting for Fitness Centre cards...");
