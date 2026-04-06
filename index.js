@@ -1,0 +1,156 @@
+const puppeteer = require('puppeteer');
+
+(async () => {
+  try {
+    // 🔐 SECURITY CHECK
+    if (!process.env.USERNAME || !process.env.PASSWORD) {
+      throw new Error("❌ Missing credentials! Set USERNAME and PASSWORD.");
+    }
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
+    });
+
+    const page = await browser.newPage();
+
+    await page.goto('https://gstudent.gitam.edu', {
+      waitUntil: 'networkidle2'
+    });
+
+    console.log("Page loaded");
+
+    // 🔐 LOGIN (SECURE)
+    await page.waitForSelector('#txtusername', { timeout: 10000 });
+
+    await page.type('#txtusername', process.env.USERNAME, { delay: 50 });
+    await page.type('#password', process.env.PASSWORD, { delay: 50 });
+
+    console.log("Filled credentials");
+
+    // 🔢 CAPTCHA
+    await page.waitForSelector('.preview span', { timeout: 10000 });
+
+    const captcha = await page.evaluate(() => {
+      return [...document.querySelectorAll('.preview span')]
+        .map(el => el.innerText)
+        .join('')
+        .replace(/\D/g, '');
+    });
+
+    console.log("Captcha:", captcha);
+
+    await page.type('#captcha_form', captcha);
+
+    // 🚀 LOGIN
+    await page.click('#Submit');
+
+    // wait for dashboard
+    await page.waitForSelector('#menu', { timeout: 15000 });
+
+    console.log("Logged in!");
+
+    // 📂 MENU
+    await page.click('#menu');
+    await new Promise(r => setTimeout(r, 1500));
+
+    // 🏋️ G-Sports
+    console.log("Opening G-Sports...");
+    await page.evaluate(() => {
+      if (typeof loadConfigView === 'function') {
+        loadConfigView('86');
+      } else {
+        throw new Error("loadConfigView not found");
+      }
+    });
+
+    await new Promise(r => setTimeout(r, 3000));
+    console.log("G-Sports opened");
+
+    // 🏢 Fitness Centre
+    console.log("Waiting for Fitness Centre...");
+    await page.waitForFunction(() => {
+      return [...document.querySelectorAll('h4')]
+        .some(el => el.innerText.includes('Fitness & Performance Centre'));
+    });
+
+    await page.evaluate(() => {
+      const el = [...document.querySelectorAll('h4')]
+        .find(e => e.innerText.includes('Fitness & Performance Centre'));
+      if (el) el.closest('.li_ico_block').click();
+    });
+
+    console.log("Clicked Fitness Centre");
+    await new Promise(r => setTimeout(r, 3000));
+
+    // 📅 DATE (2nd index → fallback 1st)
+    await page.waitForSelector('#res-dates');
+
+    const dateValue = await page.evaluate(() => {
+      const select = document.querySelector('#res-dates');
+      if (select.options.length > 2) {
+        return select.options[2].value;
+      } else {
+        return select.options[1].value;
+      }
+    });
+
+    await page.select('#res-dates', dateValue);
+    console.log("Date selected:", dateValue);
+    await new Promise(r => setTimeout(r, 2000));
+
+    // 🏋️ FACILITY
+    await page.waitForSelector('#facilities');
+
+    const facilityValue = await page.evaluate(() => {
+      const select = document.querySelector('#facilities');
+      return select.options[1].value;
+    });
+
+    await page.select('#facilities', facilityValue);
+    console.log("Facility selected");
+    await new Promise(r => setTimeout(r, 2000));
+
+    // ⏰ SHIFT 3
+    console.log("Waiting for Shift 3...");
+    await page.waitForSelector('button[data-text="Shift 3"]', { visible: true });
+
+    await page.click('button[data-text="Shift 3"]');
+    console.log("Shift 3 selected");
+    await new Promise(r => setTimeout(r, 2000));
+
+    // 🎯 SLOT LOOP
+    console.log("Waiting for slot to open...");
+
+    while (true) {
+      const available = await page.evaluate(() => {
+        const btn = document.querySelector('button[data-slot="05:00 PM to 06:00 PM"]');
+        return btn && !btn.disabled;
+      });
+
+      if (available) {
+        await page.click('button[data-slot="05:00 PM to 06:00 PM"]');
+        console.log("Slot selected!");
+
+        await page.waitForSelector('#proceed_to_pay_button', { visible: true });
+        await page.click('#proceed_to_pay_button');
+
+        console.log("✅ Gym booked successfully!");
+        break;
+      }
+
+      console.log("Still waiting...");
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    await browser.close();
+
+  } catch (err) {
+    console.error("ERROR:", err);
+  }
+})();
