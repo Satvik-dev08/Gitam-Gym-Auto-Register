@@ -17,12 +17,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18'
+          cache: 'npm'   # 🔥 ENABLE CACHE
 
       - name: Install dependencies
         run: npm install
-
-      # ❌ NO apt-get
-      # ❌ NO puppeteer install command
 
       - name: Run bot
         run: node index.js
