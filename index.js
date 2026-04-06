@@ -114,93 +114,87 @@ const puppeteer = require('puppeteer-core');
         .some(el => el.innerText.includes('G-Sports'));
     }, { timeout: 15000 });
 
-    await page.evaluate(() => {
+    const gSportsLink = await page.evaluate(() => {
       const el = [...document.querySelectorAll('p')]
         .find(e => e.innerText.includes('G-Sports'));
-      if (el) el.closest('a').click();
+      if (el) {
+        const href = el.closest('a')?.href;
+        return href;
+      }
+      return null;
     });
 
-    console.log("Clicked G-Sports");
+    console.log("G-Sports link:", gSportsLink);
 
-    await new Promise(r => setTimeout(r, 10000));
+    if (gSportsLink) {
+      // Navigate directly to G-Sports page
+      console.log("Navigating directly to G-Sports...");
+      await page.goto(gSportsLink, { waitUntil: 'networkidle2' });
+    } else {
+      // Fallback: click the link
+      console.log("Clicking G-Sports link...");
+      await page.evaluate(() => {
+        const el = [...document.querySelectorAll('p')]
+          .find(e => e.innerText.includes('G-Sports'));
+        if (el) el.closest('a').click();
+      });
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {
+        console.log("No navigation detected, waiting for content...");
+      });
+    }
+
+    console.log("G-Sports page loaded");
+
+    await new Promise(r => setTimeout(r, 5000));
 
     // 🏢 FITNESS CENTRE
     console.log("Waiting for Fitness Centre cards...");
 
-    // Debug: Check for iframes or other content containers
-    const fullPageDebug = await page.evaluate(() => {
+    // Debug: Check page content after G-Sports load
+    const gsportsPageDebug = await page.evaluate(() => {
       return {
-        iframes: document.querySelectorAll('iframe').length,
-        modals: document.querySelectorAll('[role="dialog"], .modal, .popup').length,
-        allClasses: [...new Set([...document.querySelectorAll('*')].map(el => el.className).filter(c => c && typeof c === 'string'))].slice(0, 50),
-        bodyText: document.body.innerText.substring(0, 500)
+        currentUrl: window.location.href,
+        title: document.title,
+        liIcoBlocks: document.querySelectorAll('.li_ico_block').length,
+        allLis: document.querySelectorAll('li').length,
+        allDivs: document.querySelectorAll('div').length,
+        pageText: document.body.innerText.substring(0, 300)
       };
     });
-    console.log("Full page debug:", fullPageDebug);
+    console.log("G-Sports page check:", gsportsPageDebug);
 
-    // Wait for any iframe to load
-    const iframeUrl = await page.evaluate(() => {
-      const iframe = document.querySelector('iframe');
-      return iframe ? iframe.src : null;
-    });
-    
-    if (iframeUrl) {
-      console.log("Found iframe, waiting for it to load:", iframeUrl);
-      await new Promise(r => setTimeout(r, 5000));
-    }
-
-    // Try to find fitness centre by searching all elements
-    const fitnessElement = await page.evaluate(() => {
-      const allElements = document.querySelectorAll('*');
-      let found = null;
-      for (let el of allElements) {
+    // Try to find and click fitness centre
+    const fitnessFound = await page.evaluate(() => {
+      // Look for fitness centre explicitly
+      const liElements = document.querySelectorAll('li, div[class*="item"], div[class*="card"]');
+      let target = null;
+      for (let el of liElements) {
         if (el.innerText && el.innerText.toLowerCase().includes('fitness')) {
-          found = el;
+          target = el;
           break;
         }
       }
-      return found ? { tag: found.tagName, class: found.className, text: found.innerText.substring(0, 100) } : null;
+      if (target) {
+        target.click?.() || target.parentElement?.click?.();
+        return true;
+      }
+      return false;
     });
-    console.log("Fitness element found:", fitnessElement);
 
-    try {
-      await page.waitForSelector('.li_ico_block', { timeout: 10000 });
-    } catch (e) {
-      console.log("`.li_ico_block` not found, trying alternatives...");
-      // Try to find any clickable card-like element
-      const alternatives = await page.evaluate(() => {
-        const candidates = [];
-        // Look for divs with click handlers
-        document.querySelectorAll('div[onclick], a[href*="fitness"], div[class*="item"], div[class*="card"], li').forEach(el => {
-          if (el.innerText && el.innerText.length < 50) {
-            candidates.push({ tag: el.tagName, class: el.className, text: el.innerText, onclick: !!el.onclick });
-          }
-        });
-        return candidates.slice(0, 10);
-      });
-      console.log("Alternative elements found:", alternatives);
+    if (fitnessFound) {
+      console.log("Clicked Fitness Centre via text search");
+    } else {
+      console.log("Fitness text not found, trying selector");
+      try {
+        await page.waitForSelector('.li_ico_block', { timeout: 10000 });
+        await page.click('.li_ico_block');
+        console.log("Clicked first .li_ico_block");
+      } catch (e) {
+        console.log("Could not find fitness centre element");
+      }
     }
 
-    await new Promise(r => setTimeout(r, 3000));
-
-    await page.evaluate(() => {
-      // Try multiple selector strategies
-      let cards = document.querySelectorAll('.li_ico_block');
-      if (cards.length === 0) {
-        cards = document.querySelectorAll('[class*="ico_block"]');
-      }
-      if (cards.length === 0) {
-        cards = document.querySelectorAll('div[onclick]');
-      }
-      if (cards.length > 0) {
-        console.log("Found", cards.length, "cards");
-        cards[0].click();
-      } else {
-        console.log("No cards found");
-      }
-    });
-
-    console.log("Clicked Fitness Centre");
+    await new Promise(r => setTimeout(r, 5000));
 
     await new Promise(r => setTimeout(r, 4000));
 
