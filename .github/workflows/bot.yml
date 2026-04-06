@@ -20,17 +20,12 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-        env:
-          npm_config_build_from_source: true
 
-      - name: Install Chromium via Puppeteer
-        run: npx puppeteer browsers install chrome
-        env:
-          PUPPETEER_SKIP_DOWNLOAD: false
+      # ❌ NO apt-get
+      # ❌ NO puppeteer install command
 
       - name: Run bot
         run: node index.js
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
-          PUPPETEER_EXECUTABLE_PATH: /home/runner/.cache/puppeteer/chrome/linux-*/chrome-linux/chrome
