@@ -84,12 +84,12 @@ const puppeteer = require('puppeteer-core');
 
     console.log("Clicked G-Sports");
 
-    await new Promise(r => setTimeout(r, 6000));
+    await new Promise(r => setTimeout(r, 10000));
 
     // 🏢 FITNESS CENTRE
     console.log("Waiting for Fitness Centre cards...");
 
-    await page.waitForSelector('.li_ico_block', { timeout: 20000 });
+    await page.waitForSelector('.li_ico_block', { timeout: 30000 });
     await new Promise(r => setTimeout(r, 3000));
 
     await page.evaluate(() => {
