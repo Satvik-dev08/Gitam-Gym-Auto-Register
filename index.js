@@ -89,12 +89,42 @@ const puppeteer = require('puppeteer-core');
     // 🏢 FITNESS CENTRE
     console.log("Waiting for Fitness Centre cards...");
 
-    await page.waitForSelector('.li_ico_block', { timeout: 30000 });
+    // Debug: Check what elements are on the page
+    const pageElements = await page.evaluate(() => {
+      return {
+        liIcoBlocks: document.querySelectorAll('.li_ico_block').length,
+        allDivs: document.querySelectorAll('div[class*="ico"]').length,
+        allCards: document.querySelectorAll('[class*="card"]').length,
+        pageTitle: document.title,
+        bodyHTML: document.body.innerText.substring(0, 200)
+      };
+    });
+    console.log("Page elements found:", pageElements);
+
+    // Try multiple selectors
+    try {
+      await page.waitForSelector('.li_ico_block', { timeout: 15000 });
+    } catch (e) {
+      console.log("`.li_ico_block` not found, trying alternatives...");
+      // Try alternative selectors
+      await page.waitForSelector('[class*="ico_block"], [class*="facility"], div[role="button"]', { timeout: 15000 });
+    }
+
     await new Promise(r => setTimeout(r, 3000));
 
     await page.evaluate(() => {
-      const cards = document.querySelectorAll('.li_ico_block');
-      if (cards.length > 0) cards[0].click();
+      // Try multiple selector strategies
+      let cards = document.querySelectorAll('.li_ico_block');
+      if (cards.length === 0) {
+        cards = document.querySelectorAll('[class*="ico_block"]');
+      }
+      if (cards.length === 0) {
+        cards = document.querySelectorAll('div[role="button"]');
+      }
+      if (cards.length > 0) {
+        console.log("Found", cards.length, "cards");
+        cards[0].click();
+      }
     });
 
     console.log("Clicked Fitness Centre");
