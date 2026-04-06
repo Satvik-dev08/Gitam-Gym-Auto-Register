@@ -68,44 +68,24 @@ const puppeteer = require('puppeteer');
 
     console.log("Clicked G-Sports");
 
-    // 🔥 WAIT FOR CONTENT LOAD (NO IFRAME)
+    // 🔥 WAIT FOR CONTENT LOAD
     console.log("Waiting for G-Sports content to load...");
     await new Promise(r => setTimeout(r, 6000));
 
-    // 🏢 FITNESS CENTRE (RETRY LOGIC)
-    console.log("Waiting for Fitness Centre...");
+    // 🏢 FITNESS CENTRE (FINAL FIX)
+    console.log("Waiting for Fitness Centre cards...");
 
-    let clicked = false;
+    await page.waitForSelector('.li_ico_block', { timeout: 20000 });
+    await new Promise(r => setTimeout(r, 3000));
 
-    for (let i = 0; i < 20; i++) {
-      try {
-        const found = await page.evaluate(() => {
-          const el = [...document.querySelectorAll('h4')]
-            .find(e => e.innerText.includes('Fitness & Performance Centre'));
+    await page.evaluate(() => {
+      const cards = document.querySelectorAll('.li_ico_block');
+      if (cards.length > 0) {
+        cards[0].click(); // first card = Fitness Centre
+      }
+    });
 
-          if (el) {
-            el.closest('.li_ico_block').click();
-            return true;
-          }
-          return false;
-        });
-
-        if (found) {
-          console.log("Clicked Fitness Centre");
-          clicked = true;
-          break;
-        }
-
-      } catch (e) {}
-
-      console.log("Retrying Fitness Centre...");
-      await new Promise(r => setTimeout(r, 2000));
-    }
-
-    if (!clicked) {
-      await page.screenshot({ path: 'debug.png' });
-      throw new Error("❌ Could not find Fitness Centre");
-    }
+    console.log("Clicked Fitness Centre");
 
     await new Promise(r => setTimeout(r, 4000));
 
