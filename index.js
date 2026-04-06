@@ -217,22 +217,57 @@ const puppeteer = require('puppeteer-core');
     console.log("Waiting for facilities to load...");
     await new Promise(r => setTimeout(r, 3000));
     
-    await page.waitForFunction(() => {
-      const select = document.querySelector('#facilities');
-      return select && select.options.length > 1;
-    }, { timeout: 30000 });
+    // Debug what's on the page after date selection
+    const facilitiesDebug = await page.evaluate(() => {
+      const dateSelect = document.querySelector('#res-dates');
+      const facilitiesSelect = document.querySelector('#facilities');
+      const allSelects = [...document.querySelectorAll('select')];
+      
+      return {
+        dateSelectFound: !!dateSelect,
+        facilitiesSelectFound: !!facilitiesSelect,
+        facilitiesValue: facilitiesSelect?.value,
+        facilitiesOptionsCount: facilitiesSelect?.options?.length || 0,
+        facilitiesOptions: facilitiesSelect ? [...facilitiesSelect.options].map((o, i) => ({ index: i, value: o.value, text: o.text })) : [],
+        allSelectCount: allSelects.length,
+        allSelectIds: allSelects.map(s => s.id)
+      };
+    });
+    console.log("Facilities dropdown status:", JSON.stringify(facilitiesDebug, null, 2));
+    
+    if (!facilitiesDebug.facilitiesSelectFound) {
+      throw new Error("Facilities dropdown not found on page");
+    }
 
-    await new Promise(r => setTimeout(r, 1000));
+    if (facilitiesDebug.facilitiesOptionsCount <= 1) {
+      console.log("Facilities not populated yet, waiting more...");
+      await new Promise(r => setTimeout(r, 5000));
+      
+      const facilitiesDebug2 = await page.evaluate(() => {
+        const facilitiesSelect = document.querySelector('#facilities');
+        return {
+          optionsCount: facilitiesSelect?.options?.length || 0,
+          options: facilitiesSelect ? [...facilitiesSelect.options].map((o, i) => ({ index: i, value: o.value, text: o.text })) : []
+        };
+      });
+      console.log("Facilities after waiting more:", facilitiesDebug2);
+    }
 
     // 🏋️ FACILITY
     const facilityValue = await page.evaluate(() => {
       const select = document.querySelector('#facilities');
-      console.log("Facilities count:", select.options.length);
+      if (!select || select.options.length <= 1) {
+        return select?.options[0]?.value || '';
+      }
       return select.options[1].value;
     });
 
-    await page.select('#facilities', facilityValue);
-    console.log("Facility selected:", facilityValue);
+    console.log("Attempting to select facility:", facilityValue);
+    
+    if (facilityValue) {
+      await page.select('#facilities', facilityValue);
+      console.log("Facility selected:", facilityValue);
+    }
 
     await new Promise(r => setTimeout(r, 2000));
 
