@@ -8,11 +8,8 @@ const puppeteer = require('puppeteer');
     }
 
     const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox'
-      ]
+      headless: "new", // ✅ modern headless
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
     const page = await browser.newPage();
@@ -23,7 +20,7 @@ const puppeteer = require('puppeteer');
 
     console.log("Page loaded");
 
-    // 🔐 LOGIN (SECURE)
+    // 🔐 LOGIN
     await page.waitForSelector('#txtusername', { timeout: 10000 });
 
     await page.type('#txtusername', process.env.USERNAME, { delay: 50 });
@@ -48,30 +45,34 @@ const puppeteer = require('puppeteer');
     // 🚀 LOGIN
     await page.click('#Submit');
 
-    // wait for dashboard
     await page.waitForSelector('#menu', { timeout: 15000 });
 
     console.log("Logged in!");
 
     // 📂 MENU
     await page.click('#menu');
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 2000));
 
-    // 🏋️ G-Sports
-    console.log("Opening G-Sports...");
+    // 🏋️ G-Sports (FIXED CLICK METHOD)
+    console.log("Waiting for G-Sports button...");
+
+    await page.waitForFunction(() => {
+      return [...document.querySelectorAll('p')]
+        .some(el => el.innerText.includes('G-Sports'));
+    }, { timeout: 15000 });
+
     await page.evaluate(() => {
-      if (typeof loadConfigView === 'function') {
-        loadConfigView('86');
-      } else {
-        throw new Error("loadConfigView not found");
-      }
+      const el = [...document.querySelectorAll('p')]
+        .find(e => e.innerText.includes('G-Sports'));
+      if (el) el.closest('a').click();
     });
 
+    console.log("Clicked G-Sports");
     await new Promise(r => setTimeout(r, 3000));
-    console.log("G-Sports opened");
 
     // 🏢 Fitness Centre
     console.log("Waiting for Fitness Centre...");
+
     await page.waitForFunction(() => {
       return [...document.querySelectorAll('h4')]
         .some(el => el.innerText.includes('Fitness & Performance Centre'));
@@ -116,9 +117,10 @@ const puppeteer = require('puppeteer');
 
     // ⏰ SHIFT 3
     console.log("Waiting for Shift 3...");
-    await page.waitForSelector('button[data-text="Shift 3"]', { visible: true });
 
+    await page.waitForSelector('button[data-text="Shift 3"]', { visible: true });
     await page.click('button[data-text="Shift 3"]');
+
     console.log("Shift 3 selected");
     await new Promise(r => setTimeout(r, 2000));
 
