@@ -114,36 +114,22 @@ const puppeteer = require('puppeteer-core');
         .some(el => el.innerText.includes('G-Sports'));
     }, { timeout: 15000 });
 
-    const gSportsLink = await page.evaluate(() => {
+    console.log("Found G-Sports link, clicking it...");
+    
+    await page.evaluate(() => {
       const el = [...document.querySelectorAll('p')]
         .find(e => e.innerText.includes('G-Sports'));
       if (el) {
-        const href = el.closest('a')?.href;
-        return href;
+        el.closest('a').click();
       }
-      return null;
     });
 
-    console.log("G-Sports link:", gSportsLink);
-
-    if (gSportsLink) {
-      // Navigate directly to G-Sports page
-      console.log("Navigating directly to G-Sports...");
-      await page.goto(gSportsLink, { waitUntil: 'networkidle2' });
-    } else {
-      // Fallback: click the link
-      console.log("Clicking G-Sports link...");
-      await page.evaluate(() => {
-        const el = [...document.querySelectorAll('p')]
-          .find(e => e.innerText.includes('G-Sports'));
-        if (el) el.closest('a').click();
-      });
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {
-        console.log("No navigation detected, waiting for content...");
-      });
-    }
-
-    console.log("G-Sports page loaded");
+    console.log("Clicked G-Sports, waiting for page to load...");
+    
+    // Wait for network to idle after click
+    await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 15000 }).catch(() => {
+      console.log("No full navigation detected, content likely loaded dynamically");
+    });
 
     await new Promise(r => setTimeout(r, 5000));
 
