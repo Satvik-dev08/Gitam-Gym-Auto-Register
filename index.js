@@ -127,25 +127,58 @@ const puppeteer = require('puppeteer-core');
     // 🏢 FITNESS CENTRE
     console.log("Waiting for Fitness Centre cards...");
 
-    // Debug: Check what elements are on the page
-    const pageElements = await page.evaluate(() => {
+    // Debug: Check for iframes or other content containers
+    const fullPageDebug = await page.evaluate(() => {
       return {
-        liIcoBlocks: document.querySelectorAll('.li_ico_block').length,
-        allDivs: document.querySelectorAll('div[class*="ico"]').length,
-        allCards: document.querySelectorAll('[class*="card"]').length,
-        pageTitle: document.title,
-        bodyHTML: document.body.innerText.substring(0, 200)
+        iframes: document.querySelectorAll('iframe').length,
+        modals: document.querySelectorAll('[role="dialog"], .modal, .popup').length,
+        allClasses: [...new Set([...document.querySelectorAll('*')].map(el => el.className).filter(c => c && typeof c === 'string'))].slice(0, 50),
+        bodyText: document.body.innerText.substring(0, 500)
       };
     });
-    console.log("Page elements found:", pageElements);
+    console.log("Full page debug:", fullPageDebug);
 
-    // Try multiple selectors
+    // Wait for any iframe to load
+    const iframeUrl = await page.evaluate(() => {
+      const iframe = document.querySelector('iframe');
+      return iframe ? iframe.src : null;
+    });
+    
+    if (iframeUrl) {
+      console.log("Found iframe, waiting for it to load:", iframeUrl);
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
+    // Try to find fitness centre by searching all elements
+    const fitnessElement = await page.evaluate(() => {
+      const allElements = document.querySelectorAll('*');
+      let found = null;
+      for (let el of allElements) {
+        if (el.innerText && el.innerText.toLowerCase().includes('fitness')) {
+          found = el;
+          break;
+        }
+      }
+      return found ? { tag: found.tagName, class: found.className, text: found.innerText.substring(0, 100) } : null;
+    });
+    console.log("Fitness element found:", fitnessElement);
+
     try {
-      await page.waitForSelector('.li_ico_block', { timeout: 15000 });
+      await page.waitForSelector('.li_ico_block', { timeout: 10000 });
     } catch (e) {
       console.log("`.li_ico_block` not found, trying alternatives...");
-      // Try alternative selectors
-      await page.waitForSelector('[class*="ico_block"], [class*="facility"], div[role="button"]', { timeout: 15000 });
+      // Try to find any clickable card-like element
+      const alternatives = await page.evaluate(() => {
+        const candidates = [];
+        // Look for divs with click handlers
+        document.querySelectorAll('div[onclick], a[href*="fitness"], div[class*="item"], div[class*="card"], li').forEach(el => {
+          if (el.innerText && el.innerText.length < 50) {
+            candidates.push({ tag: el.tagName, class: el.className, text: el.innerText, onclick: !!el.onclick });
+          }
+        });
+        return candidates.slice(0, 10);
+      });
+      console.log("Alternative elements found:", alternatives);
     }
 
     await new Promise(r => setTimeout(r, 3000));
@@ -157,11 +190,13 @@ const puppeteer = require('puppeteer-core');
         cards = document.querySelectorAll('[class*="ico_block"]');
       }
       if (cards.length === 0) {
-        cards = document.querySelectorAll('div[role="button"]');
+        cards = document.querySelectorAll('div[onclick]');
       }
       if (cards.length > 0) {
         console.log("Found", cards.length, "cards");
         cards[0].click();
+      } else {
+        console.log("No cards found");
       }
     });
 
