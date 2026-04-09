@@ -203,29 +203,40 @@ const puppeteer = require('puppeteer-core');
 
     await new Promise(r => setTimeout(r, 4000));
 
-    // 📅 DATE
+    // 📅 DATE - Wait for NEXT day's date to be available
+    console.log("Waiting for date dropdown to populate...");
     await page.waitForSelector('#res-dates', { timeout: 15000 });
+
+    // Wait until we have at least the next day's date available
+    console.log("Waiting for next day's date to appear in dropdown...");
+    await page.waitForFunction(() => {
+      const select = document.querySelector('#res-dates');
+      // We need at least 3 options: "Select Date", today, and tomorrow
+      return select && select.options.length > 2;
+    }, { timeout: 300000 }); // Wait up to 5 minutes for next date
 
     const dateValue = await page.evaluate(() => {
       const select = document.querySelector('#res-dates');
+      
+      // Log all available dates
+      console.log("Available dates:");
+      [...select.options].forEach((opt, i) => {
+        console.log(`  [${i}] ${opt.text}`);
+      });
+
+      // Get tomorrow's date (index 2 = skip "Select Date" and today)
       if (select.options.length > 2) {
+        console.log("Selecting index 2 (next day)");
         return select.options[2].value;
       } else {
+        console.log("Next day not available yet, selecting available option");
         return select.options[1].value;
       }
     });
 
-    console.log("Available date options:");
-    await page.evaluate(() => {
-      const select = document.querySelector('#res-dates');
-      [...select.options].forEach((opt, i) => {
-        console.log(`  [${i}] ${opt.text} = ${opt.value}`);
-      });
-    });
-
     console.log("Selecting date:", dateValue);
     await page.select('#res-dates', dateValue);
-    console.log("Date selected:", dateValue);
+    console.log("Date selected successfully");
 
     // Trigger change event to make sure facilities are fetched
     await page.evaluate(() => {
@@ -234,7 +245,7 @@ const puppeteer = require('puppeteer-core');
     });
     console.log("Change event dispatched");
 
-    // ✅ FIX: Wait for facilities dropdown to actually populate after date selection
+    // ✅ Wait for facilities dropdown to populate
     console.log("Waiting for facilities to load...");
     await new Promise(r => setTimeout(r, 2000));
     
@@ -326,36 +337,47 @@ const puppeteer = require('puppeteer-core');
 
     await new Promise(r => setTimeout(r, 2000));
 
-    // 🎯 SLOT LOOP
-    console.log("Waiting for slot to open...");
+    // 🎯 SLOT LOOP - WAIT INDEFINITELY UNTIL BOOKED
+    console.log("Waiting for slot to open... (no time limit)");
 
-    const MAX_RETRIES = 30;
     let attempts = 0;
+    let booked = false;
 
-    while (attempts < MAX_RETRIES) {
+    while (!booked) {
       const available = await page.evaluate(() => {
         const btn = document.querySelector('button[data-slot="05:00 PM to 06:00 PM"]');
         return btn && !btn.disabled;
       });
 
       if (available) {
+        console.log("✅ Slot is now AVAILABLE! Booking...");
+        
         await page.click('button[data-slot="05:00 PM to 06:00 PM"]');
         console.log("Slot selected!");
 
-        await page.waitForSelector('#proceed_to_pay_button', { visible: true, timeout: 10000 });
-        await page.click('#proceed_to_pay_button');
+        try {
+          await page.waitForSelector('#proceed_to_pay_button', { visible: true, timeout: 10000 });
+          await page.click('#proceed_to_pay_button');
 
-        console.log("✅ Gym booked successfully!");
-        break;
+          console.log("✅✅✅ GYM BOOKED SUCCESSFULLY! ✅✅✅");
+          booked = true;
+          break;
+        } catch (e) {
+          console.log("Error during booking:", e.message);
+        }
       }
 
       attempts++;
-      console.log(`Still waiting... (${attempts}/${MAX_RETRIES})`);
+      if (attempts % 10 === 0) {
+        // Log every 10 attempts (every ~20 seconds)
+        console.log(`Still waiting... (${attempts} checks, ${Math.floor(attempts * 2 / 60)}+ minutes elapsed)`);
+      }
+      
       await new Promise(r => setTimeout(r, 2000));
     }
 
-    if (attempts >= MAX_RETRIES) {
-      console.log("⚠️ Slot did not open within the wait window. Exiting.");
+    if (booked) {
+      console.log("Booking complete! Closing browser...");
     }
 
     await browser.close();
